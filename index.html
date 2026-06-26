@@ -1,270 +1,644 @@
-import { useState, useEffect, useCallback } from 'react';
-
-const BOARD_WIDTH = 10;
-const BOARD_HEIGHT = 20;
-const CELL_SIZE = 24;
-
-const TETROMINOES = {
-  I: { shape: [[1, 1, 1, 1]], color: 'cyan' },
-  J: { shape: [[1, 0, 0], [1, 1, 1]], color: 'blue' },
-  L: { shape: [[0, 0, 1], [1, 1, 1]], color: 'orange' },
-  O: { shape: [[1, 1], [1, 1]], color: 'yellow' },
-  S: { shape: [[0, 1, 1], [1, 1, 0]], color: 'green' },
-  T: { shape: [[0, 1, 0], [1, 1, 1]], color: 'purple' },
-  Z: { shape: [[1, 1, 0], [0, 1, 1]], color: 'red' },
-};
-
-const createBoard = () => {
-  return Array.from({ length: BOARD_HEIGHT }, () => Array(BOARD_WIDTH).fill(0));
-};
-
-const Tetris = () => {
-  const [board, setBoard] = useState(createBoard());
-  const [currentPiece, setCurrentPiece] = useState(null);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [gameOver, setGameOver] = useState(false);
-  const [score, setScore] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-
-  const randomTetromino = () => {
-    const tetrominoes = 'IJLOSTZ';
-    const randTetromino = tetrominoes[Math.floor(Math.random() * tetrominoes.length)];
-    return TETROMINOES[randTetromino];
-  };
-
-  const newPiece = () => {
-    const piece = randomTetromino();
-    setCurrentPiece(piece);
-    setPosition({ 
-      x: Math.floor(BOARD_WIDTH / 2) - Math.floor(piece.shape[0].length / 2), 
-      y: -piece.shape.length + 1 
-    });
-    if (checkCollision(piece, { 
-      x: Math.floor(BOARD_WIDTH / 2) - Math.floor(piece.shape[0].length / 2), 
-      y: -piece.shape.length + 1 
-    })) {
-      setGameOver(true);
-    }
-  };
-
-  const checkCollision = (piece, pos) => {
-    for (let y = 0; y < piece.shape.length; y++) {
-      for (let x = 0; x < piece.shape[y].length; x++) {
-        if (piece.shape[y][x] !== 0) {
-          const newX = pos.x + x;
-          const newY = pos.y + y;
-          if (newX < 0 || newX >= BOARD_WIDTH || newY >= BOARD_HEIGHT || (newY >= 0 && board[newY][newX])) {
-            return true;
-          }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tetris</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
-      }
-    }
-    return false;
-  };
 
-  const rotate = () => {
-    if (!currentPiece || isPaused) return;
-    const rotated = currentPiece.shape.map((_, index) => currentPiece.shape.map(row => row[index])).reverse();
-    const rotatedPiece = { ...currentPiece, shape: rotated };
-    if (!checkCollision(rotatedPiece, position)) {
-      setCurrentPiece(rotatedPiece);
-    }
-  };
-
-  const move = useCallback((direction) => {
-    if (!currentPiece || isPaused) return;
-    const newPos = { ...position };
-    if (direction === 'down') newPos.y += 1;
-    if (direction === 'left') newPos.x -= 1;
-    if (direction === 'right') newPos.x += 1;
-    if (!checkCollision(currentPiece, newPos)) {
-      setPosition(newPos);
-      if (direction === 'down') return false;
-    }
-    return true;
-  }, [currentPiece, position, isPaused]);
-
-  const drop = () => {
-    if (!currentPiece || isPaused) return;
-    let newPos = { ...position };
-    while (!checkCollision(currentPiece, { ...newPos, y: newPos.y + 1 })) {
-      newPos.y += 1;
-    }
-    setPosition(newPos);
-  };
-
-  const lockPiece = () => {
-    if (!currentPiece) return;
-    const newBoard = JSON.parse(JSON.stringify(board));
-    for (let y = 0; y < currentPiece.shape.length; y++) {
-      for (let x = 0; x < currentPiece.shape[y].length; x++) {
-        if (currentPiece.shape[y][x] !== 0) {
-          const boardY = position.y + y;
-          const boardX = position.x + x;
-          if (boardY >= 0) {
-            newBoard[boardY][boardX] = currentPiece.color;
-          }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #f3f4f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-      }
-    }
-    setBoard(newBoard);
-    clearLines(newBoard);
-    newPiece();
-  };
 
-  const clearLines = (newBoard) => {
-    let linesCleared = 0;
-    for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
-      if (newBoard[y].every(cell => cell !== 0)) {
-        newBoard.splice(y, 1);
-        newBoard.unshift(Array(BOARD_WIDTH).fill(0));
-        linesCleared += 1;
-        y += 1;
-      }
-    }
-    if (linesCleared > 0) {
-      setScore(prev => prev + linesCleared * 100);
-    }
-  };
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background: #f3f4f6;
+            border-radius: 16px;
+        }
 
-  const handleKeyDown = (e) => {
-    if (gameOver) return;
-    switch (e.key) {
-      case 'ArrowLeft':
-        move('left');
-        break;
-      case 'ArrowRight':
-        move('right');
-        break;
-      case 'ArrowDown':
-        move('down');
-        break;
-      case 'ArrowUp':
-        rotate();
-        break;
-      case ' ':
-        drop();
-        break;
-      case 'p':
-        setIsPaused(prev => !prev);
-        break;
-      default:
-        break;
-    }
-  };
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #1f2937;
+            letter-spacing: 2px;
+        }
 
-  useEffect(() => {
-    if (gameOver) return;
-    newPiece();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+        .game-wrapper {
+            display: flex;
+            gap: 32px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
 
-  useEffect(() => {
-    if (gameOver || isPaused || !currentPiece) return;
-    const timer = setTimeout(() => {
-      if (move('down')) {
-        lockPiece();
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [board, currentPiece, position, move, isPaused, gameOver]);
+        .board-wrapper {
+            background: #000;
+            padding: 6px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+            position: relative;
+        }
 
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+        canvas {
+            display: block;
+            border-radius: 6px;
+            background: #0a0a0a;
+            width: 240px;
+            height: 480px;
+        }
 
-  const resetGame = () => {
-    setBoard(createBoard());
-    setCurrentPiece(null);
-    setPosition({ x: 0, y: 0 });
-    setGameOver(false);
-    setScore(0);
-    setIsPaused(false);
-    newPiece();
-  };
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            min-width: 160px;
+        }
 
-  return (
-    <div className="flex flex-col items-center p-4 bg-gray-100 min-h-screen">
-      <h1 className="text-3xl font-bold mb-4">Tetris</h1>
-      <div className="flex gap-8">
-        <div 
-          className="relative bg-black p-2 rounded-lg shadow-lg"
-          style={{ width: BOARD_WIDTH * CELL_SIZE, height: BOARD_HEIGHT * CELL_SIZE }}
-        >
-          {board.map((row, y) => (
-            <div key={y} className="flex">
-              {row.map((cell, x) => (
-                <div
-                  key={x}
-                  className="border border-gray-700 box-border"
-                  style={{
-                    width: CELL_SIZE,
-                    height: CELL_SIZE,
-                    backgroundColor: cell === 0 ? 'black' : cell
-                  }}
-                />
-              ))}
-            </div>
-          ))}
-          {currentPiece && !gameOver && (
-            <div
-              className="absolute"
-              style={{
-                top: `${(position.y + 1) * CELL_SIZE}px`,
-                left: `${position.x * CELL_SIZE}px`,
-              }}
-            >
-              {currentPiece.shape.map((row, y) => (
-                <div key={y} className="flex">
-                  {row.map((cell, x) => (
-                    <div
-                      key={x}
-                      className="border border-gray-700 box-border"
-                      style={{
-                        width: CELL_SIZE,
-                        height: CELL_SIZE,
-                        backgroundColor: cell === 0 ? 'transparent' : currentPiece.color
-                      }}
-                    />
-                  ))}
+        .panel {
+            background: #ffffff;
+            padding: 16px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .panel h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+
+        .score-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px 16px;
+            font-size: 0.9rem;
+            color: #4b5563;
+        }
+
+        .controls-grid kbd {
+            background: #e5e7eb;
+            padding: 1px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            width: 100%;
+        }
+
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-success {
+            background: #22c55e;
+            color: #fff;
+        }
+        .btn-success:hover {
+            background: #16a34a;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: #374151;
+            border: 2px solid #d1d5db;
+        }
+        .btn-outline:hover {
+            background: #f9fafb;
+        }
+
+        .game-over-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            gap: 12px;
+            backdrop-filter: blur(4px);
+        }
+
+        .game-over-overlay h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #fca5a5;
+        }
+
+        .game-over-overlay .btn {
+            width: auto;
+            padding: 10px 32px;
+        }
+
+        .pause-badge {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: 4px;
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+        }
+
+        .status-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .status-row .btn {
+            flex: 1;
+        }
+
+        @media (max-width: 640px) {
+            .game-wrapper {
+                flex-direction: column;
+                align-items: center;
+                gap: 20px;
+            }
+            .sidebar {
+                width: 100%;
+                max-width: 240px;
+            }
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🎮 TETRIS</h1>
+
+        <div class="game-wrapper">
+            <!-- Board -->
+            <div class="board-wrapper" id="boardWrapper">
+                <canvas id="gameCanvas" width="240" height="480"></canvas>
+                <!-- Game Over overlay (hidden by default) -->
+                <div class="game-over-overlay" id="gameOverOverlay" style="display:none;">
+                    <h2>GAME OVER</h2>
+                    <button class="btn btn-danger" id="playAgainBtn">Play Again</button>
                 </div>
-              ))}
+                <!-- Pause badge (hidden by default) -->
+                <div class="pause-badge" id="pauseBadge" style="display:none;">⏸ PAUSED</div>
             </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-4">
-          <div className="bg-white p-4 rounded-lg shadow-lg">
-            <h2 className="text-xl font-semibold">Score: {score}</h2>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow-lg">
-            <h2 className="text-xl font-semibold">Controls</h2>
-            <p>← →: Move</p>
-            <p>↑: Rotate</p>
-            <p>Space: Drop</p>
-            <p>P: Pause</p>
-          </div>
-          {gameOver && (
-            <div className="bg-red-100 p-4 rounded-lg shadow-lg">
-              <h2 className="text-xl font-semibold text-red-600">Game Over!</h2>
-              <button
-                onClick={resetGame}
-                className="mt-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-              >
-                Play Again
-              </button>
-            </div>
-          )}
-          <button
-            onClick={() => setIsPaused(prev => !prev)}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            {isPaused ? 'Resume' : 'Pause'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
-export default Tetris;
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="panel">
+                    <h2>Score</h2>
+                    <div class="score-value" id="scoreDisplay">0</div>
+                </div>
+
+                <div class="panel">
+                    <h2>Controls</h2>
+                    <div class="controls-grid">
+                        <span><kbd>←</kbd> <kbd>→</kbd></span>
+                        <span>Move</span>
+                        <span><kbd>↑</kbd></span>
+                        <span>Rotate</span>
+                        <span><kbd>Space</kbd></span>
+                        <span>Drop</span>
+                        <span><kbd>P</kbd></span>
+                        <span>Pause</span>
+                    </div>
+                </div>
+
+                <div class="status-row">
+                    <button class="btn btn-primary" id="pauseBtn">Pause</button>
+                    <button class="btn btn-outline" id="resetBtn">↻ Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ─── Constants ──────────────────────────────────────────────────────────
+        const BOARD_WIDTH = 10;
+        const BOARD_HEIGHT = 20;
+        const CELL_SIZE = 24;
+
+        const TETROMINOES = {
+            I: { shape: [
+                    [0, 0, 0, 0],
+                    [1, 1, 1, 1],
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0]
+                ], color: '#00e5f0' },
+            J: { shape: [
+                    [1, 0, 0],
+                    [1, 1, 1],
+                    [0, 0, 0]
+                ], color: '#3b82f6' },
+            L: { shape: [
+                    [0, 0, 1],
+                    [1, 1, 1],
+                    [0, 0, 0]
+                ], color: '#f97316' },
+            O: { shape: [
+                    [1, 1],
+                    [1, 1]
+                ], color: '#facc15' },
+            S: { shape: [
+                    [0, 1, 1],
+                    [1, 1, 0],
+                    [0, 0, 0]
+                ], color: '#22c55e' },
+            T: { shape: [
+                    [0, 1, 0],
+                    [1, 1, 1],
+                    [0, 0, 0]
+                ], color: '#a855f7' },
+            Z: { shape: [
+                    [1, 1, 0],
+                    [0, 1, 1],
+                    [0, 0, 0]
+                ], color: '#ef4444' },
+        };
+
+        const PIECE_NAMES = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+
+        // ─── DOM refs ──────────────────────────────────────────────────────────
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+        const pauseBadge = document.getElementById('pauseBadge');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const playAgainBtn = document.getElementById('playAgainBtn');
+
+        // ─── State ─────────────────────────────────────────────────────────────
+        let board = [];
+        let currentPiece = null; // { shape, color }
+        let position = { x: 0, y: 0 };
+        let gameOver = false;
+        let score = 0;
+        let isPaused = false;
+        let dropTimer = null;
+
+        // ─── Board helpers ─────────────────────────────────────────────────────
+        function createBoard() {
+            return Array.from({ length: BOARD_HEIGHT }, () =>
+                Array(BOARD_WIDTH).fill(0)
+            );
+        }
+
+        // ─── Tetromino helpers ────────────────────────────────────────────────
+        function randomTetromino() {
+            const name = PIECE_NAMES[Math.floor(Math.random() * PIECE_NAMES.length)];
+            const t = TETROMINOES[name];
+            return {
+                shape: t.shape.map(row => [...row]),
+                color: t.color,
+            };
+        }
+
+        // ─── Collision ─────────────────────────────────────────────────────────
+        function checkCollision(piece, pos) {
+            for (let y = 0; y < piece.shape.length; y++) {
+                for (let x = 0; x < piece.shape[y].length; x++) {
+                    if (piece.shape[y][x] !== 0) {
+                        const newX = pos.x + x;
+                        const newY = pos.y + y;
+                        if (
+                            newX < 0 ||
+                            newX >= BOARD_WIDTH ||
+                            newY >= BOARD_HEIGHT ||
+                            (newY >= 0 && board[newY] && board[newY][newX] !== 0)
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        // ─── Piece operations ─────────────────────────────────────────────────
+        function spawnNewPiece() {
+            const piece = randomTetromino();
+            const startX = Math.floor(BOARD_WIDTH / 2) - Math.floor(piece.shape[0].length / 2);
+            const startY = -piece.shape.length + 1;
+            const pos = { x: startX, y: startY };
+
+            if (checkCollision(piece, pos)) {
+                // Game over
+                setGameOverState(true);
+                return false;
+            }
+
+            currentPiece = piece;
+            position = pos;
+            render();
+            return true;
+        }
+
+        function rotatePiece() {
+            if (!currentPiece || gameOver || isPaused) return;
+
+            const oldShape = currentPiece.shape;
+            const rotated = oldShape[0].map((_, idx) =>
+                oldShape.map(row => row[idx]).reverse()
+            );
+            const rotatedPiece = { ...currentPiece, shape: rotated };
+
+            if (!checkCollision(rotatedPiece, position)) {
+                currentPiece = rotatedPiece;
+                render();
+            }
+        }
+
+        function movePiece(dx, dy) {
+            if (!currentPiece || gameOver || isPaused) return false;
+
+            const newPos = { x: position.x + dx, y: position.y + dy };
+            if (!checkCollision(currentPiece, newPos)) {
+                position = newPos;
+                render();
+                return true;
+            }
+            return false;
+        }
+
+        function hardDrop() {
+            if (!currentPiece || gameOver || isPaused) return;
+
+            let newPos = { ...position };
+            while (!checkCollision(currentPiece, { ...newPos, y: newPos.y + 1 })) {
+                newPos.y += 1;
+            }
+            position = newPos;
+            render();
+            lockPiece();
+        }
+
+        // ─── Lock & line clear ────────────────────────────────────────────────
+        function lockPiece() {
+            if (!currentPiece) return;
+
+            const newBoard = board.map(row => [...row]);
+
+            for (let y = 0; y < currentPiece.shape.length; y++) {
+                for (let x = 0; x < currentPiece.shape[y].length; x++) {
+                    if (currentPiece.shape[y][x] !== 0) {
+                        const boardY = position.y + y;
+                        const boardX = position.x + x;
+                        if (boardY >= 0 && boardY < BOARD_HEIGHT && boardX >= 0 && boardX < BOARD_WIDTH) {
+                            newBoard[boardY][boardX] = currentPiece.color;
+                        }
+                    }
+                }
+            }
+
+            board = newBoard;
+            clearLines();
+            render();
+
+            // Spawn next piece
+            const success = spawnNewPiece();
+            if (!success) {
+                setGameOverState(true);
+            }
+        }
+
+        function clearLines() {
+            let cleared = 0;
+            for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+                if (board[y].every(cell => cell !== 0)) {
+                    board.splice(y, 1);
+                    board.unshift(Array(BOARD_WIDTH).fill(0));
+                    cleared++;
+                    y++; // re-check same row
+                }
+            }
+            if (cleared > 0) {
+                score += cleared * 100;
+                updateScore();
+            }
+        }
+
+        // ─── Render ────────────────────────────────────────────────────────────
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw board
+            for (let y = 0; y < BOARD_HEIGHT; y++) {
+                for (let x = 0; x < BOARD_WIDTH; x++) {
+                    const color = board[y][x];
+                    ctx.fillStyle = color || '#0a0a0a';
+                    ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                    ctx.strokeStyle = '#1f1f1f';
+                    ctx.lineWidth = 0.5;
+                    ctx.strokeRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+                }
+            }
+
+            // Draw current piece
+            if (currentPiece && !gameOver) {
+                const { shape, color } = currentPiece;
+                for (let y = 0; y < shape.length; y++) {
+                    for (let x = 0; x < shape[y].length; x++) {
+                        if (shape[y][x] !== 0) {
+                            const drawX = (position.x + x) * CELL_SIZE;
+                            const drawY = (position.y + y) * CELL_SIZE;
+                            // Only draw if on screen
+                            if (position.y + y >= 0) {
+                                ctx.fillStyle = color;
+                                ctx.fillRect(drawX, drawY, CELL_SIZE, CELL_SIZE);
+                                ctx.strokeStyle = '#2a2a2a';
+                                ctx.lineWidth = 0.5;
+                                ctx.strokeRect(drawX, drawY, CELL_SIZE, CELL_SIZE);
+                                // Highlight
+                                ctx.fillStyle = 'rgba(255,255,255,0.12)';
+                                ctx.fillRect(drawX + 2, drawY + 2, CELL_SIZE - 4, 4);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ─── UI updates ────────────────────────────────────────────────────────
+        function updateScore() {
+            scoreDisplay.textContent = score;
+        }
+
+        function setGameOverState(over) {
+            gameOver = over;
+            gameOverOverlay.style.display = over ? 'flex' : 'none';
+            if (over) {
+                clearInterval(dropTimer);
+                dropTimer = null;
+            }
+            render();
+        }
+
+        function togglePause() {
+            if (gameOver) return;
+            isPaused = !isPaused;
+            pauseBadge.style.display = isPaused ? 'block' : 'none';
+            pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
+            if (isPaused) {
+                clearInterval(dropTimer);
+                dropTimer = null;
+            } else {
+                startDropTimer();
+            }
+            render();
+        }
+
+        // ─── Drop timer ────────────────────────────────────────────────────────
+        function startDropTimer() {
+            if (dropTimer) clearInterval(dropTimer);
+            if (gameOver || isPaused) return;
+            dropTimer = setInterval(() => {
+                if (!gameOver && !isPaused && currentPiece) {
+                    const moved = movePiece(0, 1);
+                    if (!moved) {
+                        lockPiece();
+                    }
+                }
+            }, 500);
+        }
+
+        // ─── Reset ─────────────────────────────────────────────────────────────
+        function resetGame() {
+            clearInterval(dropTimer);
+            dropTimer = null;
+
+            board = createBoard();
+            currentPiece = null;
+            position = { x: 0, y: 0 };
+            gameOver = false;
+            score = 0;
+            isPaused = false;
+
+            gameOverOverlay.style.display = 'none';
+            pauseBadge.style.display = 'none';
+            pauseBtn.textContent = 'Pause';
+            updateScore();
+            render();
+
+            spawnNewPiece();
+            startDropTimer();
+        }
+
+        // ─── Keyboard ──────────────────────────────────────────────────────────
+        function onKeyDown(e) {
+            const key = e.key;
+            // Prevent scrolling with arrow keys / space
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'p', 'P'].includes(key)) {
+                e.preventDefault();
+            }
+
+            if (gameOver) return;
+
+            switch (key) {
+                case 'ArrowLeft':
+                    movePiece(-1, 0);
+                    break;
+                case 'ArrowRight':
+                    movePiece(1, 0);
+                    break;
+                case 'ArrowDown':
+                    const moved = movePiece(0, 1);
+                    if (!moved) lockPiece();
+                    break;
+                case 'ArrowUp':
+                    rotatePiece();
+                    break;
+                case ' ':
+                    hardDrop();
+                    break;
+                case 'p':
+                case 'P':
+                    togglePause();
+                    break;
+            }
+        }
+
+        // ─── Init ──────────────────────────────────────────────────────────────
+        function init() {
+            board = createBoard();
+            score = 0;
+            updateScore();
+            gameOver = false;
+            gameOverOverlay.style.display = 'none';
+            pauseBadge.style.display = 'none';
+            pauseBtn.textContent = 'Pause';
+
+            render();
+            spawnNewPiece();
+            startDropTimer();
+
+            // Event listeners
+            window.addEventListener('keydown', onKeyDown);
+
+            pauseBtn.addEventListener('click', togglePause);
+
+            resetBtn.addEventListener('click', resetGame);
+
+            playAgainBtn.addEventListener('click', resetGame);
+        }
+
+        // ─── Start ─────────────────────────────────────────────────────────────
+        init();
+    </script>
+
+</body>
+</html>
